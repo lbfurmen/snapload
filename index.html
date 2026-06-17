@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SnapLoad — Download From Anywhere</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#04040a;--surface:#0d0d18;--border:#1e1e32;
+  --gold:#f0c040;--gold2:#ffd97a;--white:#f0eee8;
+  --muted:#6b6a80;--accent:#7c5cfc;--error:#e05555;--ok:#4caf7d;
+}
+html{scroll-behavior:smooth}
+body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--white);min-height:100vh;overflow-x:hidden;cursor:none}
+
+/* CURSOR */
+#cursor{position:fixed;top:0;left:0;width:14px;height:14px;background:var(--gold);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);mix-blend-mode:difference;transition:width .15s,height .15s}
+#cursor-aura{position:fixed;top:0;left:0;width:180px;height:180px;border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);background:radial-gradient(circle,rgba(240,192,64,.13) 0%,rgba(124,92,252,.07) 40%,transparent 70%);filter:blur(2px)}
+
+/* CANVAS */
+#bg-canvas{position:fixed;inset:0;z-index:0;pointer-events:none}
+
+/* HEADER */
+header{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:1.2rem 3rem;border-bottom:1px solid var(--border);backdrop-filter:blur(12px);background:rgba(4,4,10,.7)}
+.logo{font-family:'Syne',sans-serif;font-size:1.5rem;font-weight:800;letter-spacing:-1px}
+.logo span{color:var(--gold)}
+.logo-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--gold);margin-left:2px;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+.badge{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);border:1px solid var(--border);padding:.3rem .8rem;border-radius:999px}
+
+/* HERO */
+.hero{position:relative;z-index:5;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:6rem 2rem 4rem;perspective:900px}
+.hero-label{font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);margin-bottom:1.4rem;font-weight:500;opacity:0;animation:fadeUp .6s .2s forwards}
+.hero h1{font-family:'Syne',sans-serif;font-size:clamp(3rem,8vw,6.5rem);font-weight:800;line-height:1;letter-spacing:-3px;margin-bottom:1.2rem;opacity:0;animation:fadeUp .7s .4s forwards}
+.hero h1 .line2{display:block;background:linear-gradient(90deg,var(--gold) 0%,var(--accent) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:1rem;color:var(--muted);max-width:420px;line-height:1.7;margin-bottom:3rem;opacity:0;animation:fadeUp .7s .6s forwards}
+@keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+
+/* 3D CARD */
+.card-3d{width:100%;max-width:720px;opacity:0;animation:fadeUp .7s .8s forwards;transform-style:preserve-3d;transition:transform .1s linear}
+
+/* TABS */
+.tabs{display:flex;flex-wrap:wrap;justify-content:center;gap:.5rem;margin-bottom:1.2rem}
+.tab{display:flex;align-items:center;gap:.4rem;padding:.38rem .9rem;border-radius:999px;font-size:.78rem;font-weight:600;border:1.5px solid var(--border);background:transparent;color:var(--muted);cursor:none;transition:all .2s;font-family:inherit}
+.tab:hover{border-color:var(--gold);color:var(--white)}
+.tab.active{background:var(--gold);color:#000;border-color:var(--gold)}
+.tab-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+
+/* MAIN BOX */
+.main-box{background:rgba(13,13,24,.85);border:1px solid var(--border);border-radius:20px;padding:2rem;backdrop-filter:blur(20px);box-shadow:0 0 60px rgba(124,92,252,.08),0 20px 60px rgba(0,0,0,.5);position:relative;overflow:hidden}
+.main-box::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(240,192,64,.04) 0%,transparent 60%);pointer-events:none}
+
+.platform-header{display:flex;align-items:center;gap:.8rem;margin-bottom:1.4rem}
+.p-icon-lg{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0}
+.p-title{font-size:1rem;font-weight:700}
+.p-hint{font-size:.75rem;color:var(--muted);margin-top:.15rem}
+
+.input-row{display:flex;gap:.6rem}
+.url-input{flex:1;background:#080810;border:1.5px solid var(--border);border-radius:12px;padding:.9rem 1.2rem;font-size:.9rem;color:var(--white);font-family:inherit;outline:none;transition:border-color .2s,box-shadow .2s;direction:ltr}
+.url-input::placeholder{color:#3a3a55}
+.url-input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(240,192,64,.1)}
+.btn-go{background:var(--gold);color:#000;border:none;border-radius:12px;padding:.9rem 1.8rem;font-size:.9rem;font-weight:700;font-family:inherit;cursor:none;white-space:nowrap;transition:all .2s;box-shadow:0 4px 20px rgba(240,192,64,.25)}
+.btn-go:hover{background:var(--gold2)}
+.btn-go:disabled{opacity:.5;cursor:not-allowed}
+
+/* RESULT AREA */
+.result{margin-top:1.2rem;display:none}
+.result.show{display:block}
+
+/* Loader */
+.wave{display:flex;gap:4px;justify-content:center;margin-bottom:.6rem}
+.wave span{width:4px;height:20px;background:var(--gold);border-radius:2px;animation:wave .9s ease-in-out infinite}
+.wave span:nth-child(2){animation-delay:.15s}
+.wave span:nth-child(3){animation-delay:.3s}
+.wave span:nth-child(4){animation-delay:.45s}
+@keyframes wave{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
+.analyzing{text-align:center;padding:1.2rem;color:var(--muted);font-size:.85rem}
+
+/* Error */
+.error-box{background:rgba(224,85,85,.1);border:1px solid rgba(224,85,85,.3);border-radius:10px;padding:.9rem 1.1rem;color:var(--error);font-size:.83rem;margin-top:.8rem}
+
+/* Result Card */
+.result-card{background:#080810;border:1px solid var(--border);border-radius:12px;padding:1.2rem;display:none;flex-direction:column;gap:1rem}
+.result-card.show{display:flex}
+
+.res-top{display:flex;gap:.9rem;align-items:flex-start}
+.res-thumb{width:100px;height:68px;border-radius:8px;object-fit:cover;background:var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.8rem;overflow:hidden}
+.res-thumb img{width:100%;height:100%;object-fit:cover;border-radius:8px}
+.res-title{font-size:.9rem;font-weight:700;margin-bottom:.3rem;line-height:1.4}
+.res-meta{font-size:.74rem;color:var(--muted);line-height:1.6}
+
+/* Format buttons */
+.formats-label{font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:.5rem}
+.formats-grid{display:flex;gap:.5rem;flex-wrap:wrap}
+.fmt-btn{
+  display:flex;flex-direction:column;
+  padding:.5rem .9rem;border-radius:10px;
+  border:1.5px solid var(--border);background:transparent;
+  color:var(--white);cursor:none;font-family:inherit;
+  transition:all .2s;text-align:left;
+}
+.fmt-btn:hover{border-color:var(--gold);background:rgba(240,192,64,.05)}
+.fmt-btn.audio{border-color:var(--accent)}
+.fmt-btn.audio:hover{background:rgba(124,92,252,.08)}
+.fmt-res{font-size:.82rem;font-weight:700}
+.fmt-ext{font-size:.7rem;color:var(--muted);margin-top:.1rem}
+.fmt-size{font-size:.68rem;color:var(--muted)}
+
+/* SECTIONS */
+.section{position:relative;z-index:5;padding:5rem 3rem;max-width:1100px;margin:0 auto}
+.sec-label{font-size:.7rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:.6rem}
+.sec-title{font-family:'Syne',sans-serif;font-size:clamp(1.8rem,3vw,2.8rem);font-weight:800;letter-spacing:-1px;margin-bottom:2.5rem}
+.sec-title span{color:var(--gold)}
+.divider{position:relative;z-index:5;max-width:1100px;margin:0 auto;padding:0 3rem}
+.divider hr{border:none;border-top:1px solid var(--border)}
+
+/* PLATFORMS GRID */
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem}
+.pcard{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:1.4rem 1.2rem;cursor:none;transition:all .25s;display:flex;align-items:center;gap:1rem}
+.pcard:hover{border-color:var(--gold);background:#111120;transform:translateY(-3px);box-shadow:0 8px 30px rgba(240,192,64,.1)}
+.pcard-icon{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0}
+.pcard-name{font-size:.93rem;font-weight:700}
+.pcard-desc{font-size:.72rem;color:var(--muted);margin-top:.2rem}
+
+/* FEATURES */
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem}
+.fcard{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:1.5rem;transition:border-color .2s}
+.fcard:hover{border-color:var(--accent)}
+.fcard-icon{font-size:1.6rem;margin-bottom:.8rem}
+.fcard h3{font-size:.92rem;font-weight:700;margin-bottom:.4rem}
+.fcard p{font-size:.8rem;color:var(--muted);line-height:1.65}
+
+/* FOOTER */
+footer{position:relative;z-index:5;border-top:1px solid var(--border);padding:2rem 3rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem}
+.footer-logo{font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:800;letter-spacing:-1px}
+.footer-logo span{color:var(--gold)}
+.footer-copy,.footer-note{font-size:.75rem;color:var(--muted)}
+
+@media(max-width:600px){
+  header{padding:1rem 1.2rem}
+  .section,.features-sec,.divider{padding-left:1.2rem;padding-right:1.2rem}
+  .input-row{flex-direction:column}
+  footer{padding:1.5rem 1.2rem;flex-direction:column;text-align:center}
+}
+</style>
+</head>
+<body>
+
+<div id="cursor"></div>
+<div id="cursor-aura"></div>
+<canvas id="bg-canvas"></canvas>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">Snap<span>Load</span><span class="logo-dot"></span></div>
+  <div class="badge">8 Platforms · Real API</div>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <p class="hero-label">The Universal Video Downloader</p>
+  <h1>Download from<span class="line2">Anywhere.</span></h1>
+  <p class="hero-sub">Paste any link. We fetch the info, you pick the quality. Real downloads powered by yt-dlp.</p>
+
+  <div class="card-3d" id="card3d">
+    <div class="tabs">
+      <button class="tab active" onclick="selectP('youtube')"   id="tab-youtube">  <span class="tab-dot" style="background:#FF0000"></span>YouTube</button>
+      <button class="tab"        onclick="selectP('instagram')" id="tab-instagram"><span class="tab-dot" style="background:#E1306C"></span>Instagram</button>
+      <button class="tab"        onclick="selectP('tiktok')"    id="tab-tiktok">   <span class="tab-dot" style="background:#69C9D0"></span>TikTok</button>
+      <button class="tab"        onclick="selectP('facebook')"  id="tab-facebook"> <span class="tab-dot" style="background:#1877F2"></span>Facebook</button>
+      <button class="tab"        onclick="selectP('twitter')"   id="tab-twitter">  <span class="tab-dot" style="background:#aaa"></span>Twitter/X</button>
+      <button class="tab"        onclick="selectP('pinterest')" id="tab-pinterest"><span class="tab-dot" style="background:#E60023"></span>Pinterest</button>
+      <button class="tab"        onclick="selectP('snapchat')"  id="tab-snapchat"> <span class="tab-dot" style="background:#FFFC00"></span>Snapchat</button>
+      <button class="tab"        onclick="selectP('threads')"   id="tab-threads">  <span class="tab-dot" style="background:#ccc"></span>Threads</button>
+    </div>
+
+    <div class="main-box">
+      <div class="platform-header">
+        <div class="p-icon-lg" id="p-icon-lg" style="background:#1a0000">🔴</div>
+        <div>
+          <div class="p-title"  id="p-title">YouTube</div>
+          <div class="p-hint"   id="p-hint">Paste a YouTube video link below</div>
+        </div>
+      </div>
+      <div class="input-row">
+        <input class="url-input" id="url-input" type="url" placeholder="https://www.youtube.com/watch?v=..."/>
+        <button class="btn-go" id="btn-go" onclick="go()">↓ Fetch</button>
+      </div>
+
+      <div class="result" id="result">
+        <!-- Loader -->
+        <div class="analyzing" id="analyzing" style="display:none">
+          <div class="wave"><span></span><span></span><span></span><span></span></div>
+          Analyzing link via API...
+        </div>
+
+        <!-- Error -->
+        <div class="error-box" id="error-box" style="display:none"></div>
+
+        <!-- Result Card -->
+        <div class="result-card" id="result-card">
+          <div class="res-top">
+            <div class="res-thumb" id="res-thumb">🎬</div>
+            <div>
+              <div class="res-title" id="res-title"></div>
+              <div class="res-meta"  id="res-meta"></div>
+            </div>
+          </div>
+          <div>
+            <div class="formats-label">Choose Quality</div>
+            <div class="formats-grid" id="formats-grid"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PLATFORMS -->
+<div class="divider"><hr/></div>
+<section class="section">
+  <p class="sec-label">Supported Platforms</p>
+  <h2 class="sec-title">Every platform,<br/><span>one place.</span></h2>
+  <div class="pgrid">
+    <div class="pcard" onclick="selectP('youtube');scrollTo({top:0,behavior:'smooth'})">
+      <div class="pcard-icon" style="background:#1a0000">🔴</div>
+      <div><div class="pcard-name">YouTube</div><div class="pcard-desc">Videos, Shorts & Livestreams</div></div>
+    </div>
+    <div class="pcard" onclick="selectP('instagram');scrollTo({top:0,behavior:'smooth'})">
+      <div class="pcard-icon" style="background:#1a0010">💗</div>
+      <div><div class="pcard-name">Instagram</div><div class="pcard-desc">Reels, Stories & Posts</div></div>
+    </div>
+    <div class="pcard" onclick="selectP('tiktok');scrollTo({top:0,behavior:'smooth'})">
+      <div class="pcard-icon" style="background:#001515">🎵</div>
+      <div><div class="pcard-name">TikTok</div><div class="pcard-desc">No watermark downloads</div></div>
+    </div>
+    <div class="pcard" onclick="selectP('facebook');scrollTo({top:0,behavior:'smooth'})">
+      <div class="pcard-icon" style="background:#001030">🔵</div>
+      <div><div class="pcard-name">Facebook</div><div class="pcard-desc">Videos, Reels & Lives</div></div>
+    </div>
+    <div class="pcard" onclick="selectP('twitter');scrollTo({top:0,behavior:'smooth'})">
+      <div class="pcard-icon" style="background:#111">✖️</div>
+      <div><div class="pcard-name">Twitter / X</div><div class="pcard-desc">Video tweets & GIFs</div></div>
+    </div>
+    <div class="pcard" onclick="selectP('pinterest');scrollTo({top:0,behavior:'smooth'})">
+      <div class="pcard-icon" style="background:#1a0004">📌</div>
+      <div><div class="pcard-name">Pinterest</div><div class="pcard-desc">Images & video pins</div></div>
+    </div>
+    <div class="pcard" onclick="selectP('snapchat');scrollTo({top:0,behavior:'smooth'})">
+      <div class="pcard-icon" style="background:#1a1a00">👻</div>
+      <div><div class="pcard-name">Snapchat</div><div class="pcard-desc">Spotlight & public stories</div></div>
+    </div>
+    <div class="pcard" onclick="selectP('threads');scrollTo({top:0,behavior:'smooth'})">
+      <div class="pcard-icon" style="background:#111">🧵</div>
+      <div><div class="pcard-name">Threads</div><div class="pcard-desc">Videos & media posts</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<div class="divider"><hr/></div>
+<section class="section">
+  <p class="sec-label">Why SnapLoad</p>
+  <h2 class="sec-title">Built different,<br/><span>by design.</span></h2>
+  <div class="fgrid">
+    <div class="fcard"><div class="fcard-icon">⚡</div><h3>Instant Analysis</h3><p>Links parsed and ready in under 2 seconds via yt-dlp.</p></div>
+    <div class="fcard"><div class="fcard-icon">🎯</div><h3>Real Formats</h3><p>See the actual available qualities for every video, not just guesses.</p></div>
+    <div class="fcard"><div class="fcard-icon">🚿</div><h3>No Watermark</h3><p>TikTok & Instagram videos without any platform branding.</p></div>
+    <div class="fcard"><div class="fcard-icon">🔒</div><h3>Zero Tracking</h3><p>No logs, no accounts, no data stored. Your links stay yours.</p></div>
+    <div class="fcard"><div class="fcard-icon">📱</div><h3>Any Device</h3><p>Works on mobile, tablet and desktop. No app needed.</p></div>
+    <div class="fcard"><div class="fcard-icon">∞</div><h3>No Limits</h3><p>Unlimited downloads, free forever.</p></div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">Snap<span>Load</span></div>
+  <div class="footer-copy">© 2026 SnapLoad — For personal & educational use only</div>
+  <div class="footer-note">Respects intellectual property rights</div>
+</footer>
+
+<script>
+/* ── CURSOR ── */
+const cursor=document.getElementById('cursor');
+const aura=document.getElementById('cursor-aura');
+let mx=window.innerWidth/2,my=window.innerHeight/2;
+document.addEventListener('mousemove',e=>{
+  mx=e.clientX;my=e.clientY;
+  cursor.style.transform=`translate(${mx-7}px,${my-7}px)`;
+  aura.style.transform=`translate(${mx-90}px,${my-90}px)`;
+});
+
+/* ── CANVAS ── */
+const canvas=document.getElementById('bg-canvas');
+const ctx=canvas.getContext('2d');
+let W,H,particles=[];
+function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight}
+resize();window.addEventListener('resize',resize);
+class Particle{
+  constructor(){this.reset()}
+  reset(){this.x=Math.random()*W;this.y=Math.random()*H;this.r=Math.random()*1.5+.3;this.vx=(Math.random()-.5)*.25;this.vy=(Math.random()-.5)*.25;this.alpha=Math.random()*.5+.1;this.color=Math.random()>.5?'240,192,64':'124,92,252'}
+  update(){this.x+=this.vx+(mx/W-.5)*.3;this.y+=this.vy+(my/H-.5)*.3;if(this.x<0||this.x>W||this.y<0||this.y>H)this.reset()}
+  draw(){ctx.beginPath();ctx.arc(this.x,this.y,this.r,0,Math.PI*2);ctx.fillStyle=`rgba(${this.color},${this.alpha})`;ctx.fill()}
+}
+for(let i=0;i<120;i++)particles.push(new Particle());
+function drawGrid(){
+  ctx.strokeStyle='rgba(30,30,50,.35)';ctx.lineWidth=.5;
+  const s=80;
+  for(let x=0;x<W;x+=s){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
+  for(let y=0;y<H;y+=s){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+}
+function drawMouseGlow(){
+  const g=ctx.createRadialGradient(mx,my,0,mx,my,280);
+  g.addColorStop(0,'rgba(240,192,64,.06)');g.addColorStop(.5,'rgba(124,92,252,.03)');g.addColorStop(1,'transparent');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+}
+function loop(){
+  ctx.clearRect(0,0,W,H);drawGrid();drawMouseGlow();
+  particles.forEach(p=>{p.update();p.draw()});
+  for(let i=0;i<particles.length;i++)for(let j=i+1;j<particles.length;j++){
+    const dx=particles[i].x-particles[j].x,dy=particles[i].y-particles[j].y,d=Math.sqrt(dx*dx+dy*dy);
+    if(d<90){ctx.beginPath();ctx.moveTo(particles[i].x,particles[i].y);ctx.lineTo(particles[j].x,particles[j].y);ctx.strokeStyle=`rgba(240,192,64,${.12*(1-d/90)})`;ctx.lineWidth=.5;ctx.stroke()}
+  }
+  requestAnimationFrame(loop);
+}
+loop();
+
+/* ── 3D TILT ── */
+const card3d=document.getElementById('card3d');
+document.addEventListener('mousemove',e=>{
+  const r=card3d.getBoundingClientRect();
+  const dx=(e.clientX-(r.left+r.width/2))/(window.innerWidth/2);
+  const dy=(e.clientY-(r.top+r.height/2))/(window.innerHeight/2);
+  card3d.style.transform=`rotateX(${-dy*8}deg) rotateY(${dx*8}deg)`;
+});
+document.addEventListener('mouseleave',()=>{card3d.style.transform='rotateX(0) rotateY(0)'});
+
+/* ── PLATFORM DATA ── */
+const platforms={
+  youtube:  {name:'YouTube',   hint:'Paste a YouTube video link',         icon:'🔴',bg:'#1a0000',ph:'https://www.youtube.com/watch?v=...'},
+  instagram:{name:'Instagram', hint:'Paste a Reel, Story or post link',   icon:'💗',bg:'#1a0010',ph:'https://www.instagram.com/reel/...'},
+  tiktok:   {name:'TikTok',   hint:'Paste a TikTok video link',           icon:'🎵',bg:'#001515',ph:'https://www.tiktok.com/@user/video/...'},
+  facebook: {name:'Facebook', hint:'Paste a Facebook video link',         icon:'🔵',bg:'#001030',ph:'https://www.facebook.com/watch?v=...'},
+  twitter:  {name:'Twitter/X',hint:'Paste a tweet link with video',       icon:'✖️',bg:'#111',   ph:'https://x.com/user/status/...'},
+  pinterest:{name:'Pinterest',hint:'Paste a Pinterest pin link',          icon:'📌',bg:'#1a0004',ph:'https://www.pinterest.com/pin/...'},
+  snapchat: {name:'Snapchat', hint:'Paste a Spotlight or story link',     icon:'👻',bg:'#1a1a00',ph:'https://www.snapchat.com/spotlight/...'},
+  threads:  {name:'Threads',  hint:'Paste a Threads post link',           icon:'🧵',bg:'#111',   ph:'https://www.threads.net/@user/post/...'},
+};
+let current='youtube';
+
+function selectP(key){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+key).classList.add('active');
+  const p=platforms[key];current=key;
+  document.getElementById('p-icon-lg').textContent=p.icon;
+  document.getElementById('p-icon-lg').style.background=p.bg;
+  document.getElementById('p-title').textContent=p.name;
+  document.getElementById('p-hint').textContent=p.hint;
+  document.getElementById('url-input').placeholder=p.ph;
+  document.getElementById('url-input').value='';
+  resetResult();
+}
+
+function resetResult(){
+  document.getElementById('result').classList.remove('show');
+  document.getElementById('result-card').classList.remove('show');
+  document.getElementById('error-box').style.display='none';
+  document.getElementById('analyzing').style.display='none';
+}
+
+function formatSize(bytes){
+  if(!bytes)return'';
+  if(bytes>1e9)return(bytes/1e9).toFixed(1)+' GB';
+  if(bytes>1e6)return(bytes/1e6).toFixed(0)+' MB';
+  return(bytes/1e3).toFixed(0)+' KB';
+}
+
+function formatDuration(secs){
+  if(!secs)return'';
+  const m=Math.floor(secs/60),s=Math.floor(secs%60);
+  return`${m}:${String(s).padStart(2,'0')}`;
+}
+
+/* ── MAIN FETCH ── */
+async function go(){
+  const url=document.getElementById('url-input').value.trim();
+  if(!url){
+    document.getElementById('url-input').style.borderColor='#c0392b';
+    setTimeout(()=>document.getElementById('url-input').style.borderColor='',1500);
+    return;
+  }
+
+  const btn=document.getElementById('btn-go');
+  btn.disabled=true;btn.textContent='...';
+
+  resetResult();
+  document.getElementById('result').classList.add('show');
+  document.getElementById('analyzing').style.display='block';
+
+  try{
+    // ── Call real API ──
+    const res=await fetch(`/api/info?url=${encodeURIComponent(url)}`);
+    const data=await res.json();
+
+    document.getElementById('analyzing').style.display='none';
+
+    if(!data.success){
+      document.getElementById('error-box').style.display='block';
+      document.getElementById('error-box').textContent='⚠️ '+data.error;
+      return;
+    }
+
+    // Populate result card
+    const rc=document.getElementById('result-card');
+    rc.classList.add('show');
+
+    // Thumbnail
+    const thumb=document.getElementById('res-thumb');
+    if(data.thumbnail){
+      thumb.innerHTML=`<img src="${data.thumbnail}" alt="thumb"/>`;
+    } else {
+      thumb.textContent=platforms[current].icon;
+    }
+
+    document.getElementById('res-title').textContent=data.title;
+    document.getElementById('res-meta').textContent=
+      [data.platform, data.uploader, formatDuration(data.duration),
+       data.view_count?data.view_count.toLocaleString()+' views':null]
+      .filter(Boolean).join(' · ');
+
+    // Formats
+    const grid=document.getElementById('formats-grid');
+    grid.innerHTML='';
+    (data.formats||[]).forEach(f=>{
+      const isAudio=f.vcodec==='none';
+      const btn=document.createElement('button');
+      btn.className='fmt-btn'+(isAudio?' audio':'');
+      btn.innerHTML=`
+        <span class="fmt-res">${isAudio?'♪ Audio':f.resolution||f.ext}</span>
+        <span class="fmt-ext">${f.ext.toUpperCase()}${f.fps?` · ${f.fps}fps`:''}</span>
+        ${f.filesize?`<span class="fmt-size">${formatSize(f.filesize)}</span>`:''}
+      `;
+      btn.onclick=()=>{
+        const dl=document.createElement('a');
+        dl.href=`/api/download?url=${encodeURIComponent(url)}&format_id=${f.format_id}&filename=${encodeURIComponent(data.title)}`;
+        dl.click();
+      };
+      grid.appendChild(btn);
+    });
+
+  }catch(err){
+    document.getElementById('analyzing').style.display='none';
+    document.getElementById('error-box').style.display='block';
+    document.getElementById('error-box').textContent='⚠️ Cannot reach server. Is it running?';
+  }finally{
+    btn.disabled=false;btn.textContent='↓ Fetch';
+  }
+}
+
+document.getElementById('url-input').addEventListener('keydown',e=>{if(e.key==='Enter')go()});
+</script>
+</body>
+</html>
